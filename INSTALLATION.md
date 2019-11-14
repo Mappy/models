@@ -71,7 +71,7 @@ see more at: https://github.com/tensorflow/models/blob/master/research/object_de
     tar -xvf faster_rcnn_resnet101_coco_11_06_2017.tar.gz
     gsutil cp <dir>/faster_rcnn_resnet101_coco_11_06_2017/model.ckpt.* gs://${YOUR_GCS_BUCKET}/data/
 
-##CHECKING GOOGLE CLOUD STRORAGE BUCKET 
+## CHECKING GOOGLE CLOUD STRORAGE BUCKET
 see more at: https://console.cloud.google.com/storage/browser?project=mappy-blur-ia&folder&organizationId=489668500446
 + ${YOUR_GCS_BUCKET}/
   + data/
@@ -127,12 +127,3 @@ You can monitor progress of the training and eval jobs by running Tensorboard on
         --pipeline_config_path object_detection/samples/configs/faster_rcnn_resnet101_mappy_blur.config \
         --trained_checkpoint_prefix model.ckpt-${CHECKPOINT_NUMBER} \
         --output_directory <project_dir>/mappy_trained_models/exported_graphs
-
-
-gsutil cp gs://${YOUR_GCS_BUCKET}/model_dir/model.ckpt-6055.* .
-
-python object_detection/export_inference_graph.py \
---input_type image_tensor \
---pipeline_config_path object_detection/samples/configs/faster_rcnn_resnet101_mappy_blur.config \
---trained_checkpoint_prefix model.ckpt-6055 \
---output_directory exported_graphs
