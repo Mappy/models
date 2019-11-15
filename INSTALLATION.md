@@ -12,7 +12,7 @@
 see more at: https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/installation.md
 
     - COCO API installation
-        git clone https://`github.com/cocodataset/cocoapi.git
+        git clone https://github.com/cocodataset/cocoapi.git
         cd cocoapi/PythonAPI
         make
         cp -r pycocotools <path_to_tensorflow>/models/research/
@@ -30,6 +30,7 @@ see more at: https://github.com/tensorflow/models/blob/master/research/object_de
     - Testing the Installation
         # From tensorflow/models/research/
         python object_detection/builders/model_builder_test.py
+        
 
 ## CREATION OF MAPPY RECORDS
 
