@@ -99,7 +99,7 @@ see more at: https://console.cloud.google.com/storage/browser?project=mappy-blur
     + To start training and evaluation
         
         # From <project_dir>/models/research/
-        gcloud ml-engine jobs submit training 'whoami'_object_detection_mappy_blur_'date +%m_%d_%Y_%H_%M_%S'
+        gcloud ai-platform jobs submit training 'whoami'_object_detection_mappy_blur_'date +%m_%d_%Y_%H_%M_%S'
          --runtime-version 1.12
          --job-dir=gs://${YOUR_GCS_BUCKET}/model_dir
          --packages dist/object_detection-0.1.tar.gz,slim/dist/slim-0.1.tar.gz,/tmp/pycocotools/pycocotools-2.0.tar.gz

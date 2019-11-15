@@ -40,7 +40,7 @@ from six.moves import zip
 import tensorflow as tf
 
 from object_detection.core import standard_fields as fields
-
+from object_detection.utils import shape_utils
 
 _TITLE_LEFT_MARGIN = 10
 _TITLE_TOP_MARGIN = 10
@@ -394,11 +394,23 @@ def create_visualization_fn(category_index, include_masks=False,
   return visualization_py_func_fn
 
 
+def _resize_original_image(image, image_shape):
+  image = tf.expand_dims(image, 0)
+  image = tf.image.resize_images(
+      image,
+      image_shape,
+      method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+      align_corners=True)
+  return tf.cast(tf.squeeze(image, 0), tf.uint8)
+
+
 def draw_bounding_boxes_on_image_tensors(images,
                                          boxes,
                                          classes,
                                          scores,
                                          category_index,
+                                         original_image_spatial_shape=None,
+                                         true_image_shape=None,
                                          instance_masks=None,
                                          keypoints=None,
                                          track_ids=None,
@@ -409,13 +421,18 @@ def draw_bounding_boxes_on_image_tensors(images,
 
   Args:
     images: A 4D uint8 image tensor of shape [N, H, W, C]. If C > 3, additional
-      channels will be ignored.
+      channels will be ignored. If C = 1, then we convert the images to RGB
+      images.
     boxes: [N, max_detections, 4] float32 tensor of detection boxes.
     classes: [N, max_detections] int tensor of detection classes. Note that
       classes are 1-indexed.
     scores: [N, max_detections] float32 tensor of detection scores.
     category_index: a dict that maps integer ids to category dicts. e.g.
       {1: {1: 'dog'}, 2: {2: 'cat'}, ...}
+    original_image_spatial_shape: [N, 2] tensor containing the spatial size of
+      the original image.
+    true_image_shape: [N, 3] tensor containing the spatial size of unpadded
+      original_image.
     instance_masks: A 4D uint8 tensor of shape [N, max_detection, H, W] with
       instance masks.
     keypoints: A 4D float32 tensor of shape [N, max_detection, num_keypoints, 2]
@@ -433,7 +450,10 @@ def draw_bounding_boxes_on_image_tensors(images,
     4D image tensor of type uint8, with boxes drawn on top.
   """
   # Additional channels are being ignored.
-  images = images[:, :, :, 0:3]
+  if images.shape[3] > 3:
+    images = images[:, :, :, 0:3]
+  elif images.shape[3] == 1:
+    images = tf.image.grayscale_to_rgb(images)
   visualization_keyword_args = {
       'use_normalized_coordinates': use_normalized_coordinates,
       'max_boxes_to_draw': max_boxes_to_draw,
@@ -441,6 +461,14 @@ def draw_bounding_boxes_on_image_tensors(images,
       'agnostic_mode': False,
       'line_thickness': 4
   }
+  if true_image_shape is None:
+    true_shapes = tf.constant(-1, shape=[images.shape.as_list()[0], 3])
+  else:
+    true_shapes = true_image_shape
+  if original_image_spatial_shape is None:
+    original_shapes = tf.constant(-1, shape=[images.shape.as_list()[0], 2])
+  else:
+    original_shapes = original_image_spatial_shape
 
   visualize_boxes_fn = create_visualization_fn(
       category_index,
@@ -459,7 +487,15 @@ def draw_bounding_boxes_on_image_tensors(images,
 
   def draw_boxes(image_and_detections):
     """Draws boxes on image."""
-    image_with_boxes = tf.py_func(visualize_boxes_fn, image_and_detections,
+    true_shape = image_and_detections[0]
+    original_shape = image_and_detections[1]
+    if true_image_shape is not None:
+      image = shape_utils.pad_or_clip_nd(image_and_detections[2],
+                                         [true_shape[0], true_shape[1], 3])
+    if original_image_spatial_shape is not None:
+      image_and_detections[2] = _resize_original_image(image, original_shape)
+
+    image_with_boxes = tf.py_func(visualize_boxes_fn, image_and_detections[2:],
                                   tf.uint8)
     return image_with_boxes
 
@@ -479,6 +515,7 @@ def draw_side_by_side_evaluation_image(eval_dict,
 
   Args:
     eval_dict: The evaluation dictionary returned by
+      eval_util.result_dict_for_batched_example() or
       eval_util.result_dict_for_single_example().
     category_index: A category index (dictionary) produced from a labelmap.
     max_boxes_to_draw: The maximum number of boxes to draw for detections.
@@ -488,8 +525,9 @@ def draw_side_by_side_evaluation_image(eval_dict,
       Default is True.
 
   Returns:
-    A [1, H, 2 * W, C] uint8 tensor. The subimage on the left corresponds to
-      detections, while the subimage on the right corresponds to groundtruth.
+    A list of [1, H, 2 * W, C] uint8 tensor. The subimage on the left
+      corresponds to detections, while the subimage on the right corresponds to
+      groundtruth.
   """
   detection_fields = fields.DetectionResultFields()
   input_data_fields = fields.InputDataFields()
@@ -953,26 +991,33 @@ class EvalMetricOpsVisualization(six.with_metaclass(abc.ABCMeta, object)):
 
     Args:
       eval_dict: A dictionary that holds an image, groundtruth, and detections
-        for a single example. See eval_util.result_dict_for_single_example() for
-        a convenient method for constructing such a dictionary. The dictionary
+        for a batched example. Note that, we use only the first example for
+        visualization. See eval_util.result_dict_for_batched_example() for a
+        convenient method for constructing such a dictionary. The dictionary
         contains
-        fields.InputDataFields.original_image: [1, H, W, 3] image.
-        fields.InputDataFields.groundtruth_boxes - [num_boxes, 4] float32
-          tensor with groundtruth boxes in range [0.0, 1.0].
-        fields.InputDataFields.groundtruth_classes - [num_boxes] int64
-          tensor with 1-indexed groundtruth classes.
+        fields.InputDataFields.original_image: [batch_size, H, W, 3] image.
+        fields.InputDataFields.original_image_spatial_shape: [batch_size, 2]
+          tensor containing the size of the original image.
+        fields.InputDataFields.true_image_shape: [batch_size, 3]
+          tensor containing the spatial size of the upadded original image.
+        fields.InputDataFields.groundtruth_boxes - [batch_size, num_boxes, 4]
+          float32 tensor with groundtruth boxes in range [0.0, 1.0].
+        fields.InputDataFields.groundtruth_classes - [batch_size, num_boxes]
+          int64 tensor with 1-indexed groundtruth classes.
         fields.InputDataFields.groundtruth_instance_masks - (optional)
-          [num_boxes, H, W] int64 tensor with instance masks.
-        fields.DetectionResultFields.detection_boxes - [max_num_boxes, 4]
-          float32 tensor with detection boxes in range [0.0, 1.0].
-        fields.DetectionResultFields.detection_classes - [max_num_boxes]
-          int64 tensor with 1-indexed detection classes.
-        fields.DetectionResultFields.detection_scores - [max_num_boxes]
-          float32 tensor with detection scores.
-        fields.DetectionResultFields.detection_masks - (optional)
-          [max_num_boxes, H, W] float32 tensor of binarized masks.
+          [batch_size, num_boxes, H, W] int64 tensor with instance masks.
+        fields.DetectionResultFields.detection_boxes - [batch_size,
+          max_num_boxes, 4] float32 tensor with detection boxes in range [0.0,
+          1.0].
+        fields.DetectionResultFields.detection_classes - [batch_size,
+          max_num_boxes] int64 tensor with 1-indexed detection classes.
+        fields.DetectionResultFields.detection_scores - [batch_size,
+          max_num_boxes] float32 tensor with detection scores.
+        fields.DetectionResultFields.detection_masks - (optional) [batch_size,
+          max_num_boxes, H, W] float32 tensor of binarized masks.
         fields.DetectionResultFields.detection_keypoints - (optional)
-          [max_num_boxes, num_keypoints, 2] float32 tensor with keypooints.
+          [batch_size, max_num_boxes, num_keypoints, 2] float32 tensor with
+          keypoints.
 
     Returns:
       A dictionary of image summary names to tuple of (value_op, update_op). The
@@ -981,6 +1026,8 @@ class EvalMetricOpsVisualization(six.with_metaclass(abc.ABCMeta, object)):
       groundtruth. Each `value_op` holds the tf.summary.image string for a given
       image.
     """
+    if self._max_examples_to_draw == 0:
+      return {}
     images = self.images_from_evaluation_dict(eval_dict)
 
     def get_images():
@@ -1012,7 +1059,7 @@ class EvalMetricOpsVisualization(six.with_metaclass(abc.ABCMeta, object)):
       eval_metric_ops[summary_name] = (value_op, update_op)
     return eval_metric_ops
 
-  @abstractmethod
+  @abc.abstractmethod
   def images_from_evaluation_dict(self, eval_dict):
     """Converts evaluation dictionary into a list of image tensors.
 
@@ -1047,9 +1094,6 @@ class VisualizeSingleFrameDetections(EvalMetricOpsVisualization):
         summary_name_prefix=summary_name_prefix)
 
   def images_from_evaluation_dict(self, eval_dict):
-    return [draw_side_by_side_evaluation_image(
-        eval_dict,
-        self._category_index,
-        self._max_boxes_to_draw,
-        self._min_score_thresh,
-        self._use_normalized_coordinates)]
+    return draw_side_by_side_evaluation_image(
+        eval_dict, self._category_index, self._max_boxes_to_draw,
+        self._min_score_thresh, self._use_normalized_coordinates)
