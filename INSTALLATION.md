@@ -1,5 +1,8 @@
 ## PROJECT INSTALLATION
 
+### ATTENTION !
+new gcloud sdk packages the protobuf so you should use a Python 2.7 without the protobuf -> use a virtualenv for gcloud 
+
 ### Create a venv
 	virtualenv -p python3 <venv_dir>
 	source <venv_dir>/bin/activate
@@ -58,8 +61,8 @@ see more at: https://github.com/tensorflow/models/blob/master/research/object_de
         export YOUR_GCS_BUCKET=${YOUR_GCS_BUCKET}
         
     + Push the mappy records on to the ressource of the GCP project
-        gsutil cp <project_dir>/mappy_proto_records/mappy_blur_train.record-* gs://${YOUR_GCS_BUCKET}/data/
-        gsutil cp <project_dir>/mappy_proto_records/mappy_blur_val.record-* gs://${YOUR_GCS_BUCKET}/data/
+        gsutil -m cp <project_dir>/mappy_proto_records/mappy_blur_train.record-* gs://${YOUR_GCS_BUCKET}/data/
+        gsutil -m cp <project_dir>/mappy_proto_records/mappy_blur_val.record-* gs://${YOUR_GCS_BUCKET}/data/
     
     + Push the map file
         gsutil cp <project_dir>/models/research/object_detection/data/mappy_blur_label_map.pbtxt gs://${YOUR_GCS_BUCKET}/data/mappy_blur_label_map.pbtxt

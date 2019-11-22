@@ -6,6 +6,3 @@ trainingInput:
   workerType: complex_model_m_p100
   parameterServerCount: 5
   parameterServerType: large_model
-
-
-
