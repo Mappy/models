@@ -5,3 +5,9 @@ jupyter
 matplotlib
 pillow
 lxml
+easydict==1.7
+opencv-python==3.4.0.12
+PyYAML==3.12
+requests==2.18.4
+image==1.5.16
+scipy==1.0.0

@@ -874,7 +874,6 @@ def visualize_boxes_and_labels_on_image_array(
 
   return image
 
-
 def add_cdf_image_summary(values, name):
   """Adds a tf.summary.image for a CDF plot of the values.
 
