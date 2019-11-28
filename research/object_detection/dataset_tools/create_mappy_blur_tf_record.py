@@ -261,7 +261,6 @@ def parse_rec(filename):
 
   return objects
 
-# TODO(derekjchow): Add test for pet/PASCAL main files.
 def main(_):
   data_dir = FLAGS.data_dir
   label_map_dict = label_map_util.get_label_map_dict(FLAGS.label_map_path)
@@ -270,17 +269,20 @@ def main(_):
   image_dir = os.path.join(data_dir, 'Images')
   annotations_dir = os.path.join(data_dir, 'Annotations')
   imageSets_dir = os.path.join(data_dir, 'ImageSets')
-  examples_path = os.path.join(imageSets_dir, 'train.txt')
-  examples_list = dataset_util.read_examples_list(examples_path)
+  train_examples_path = os.path.join(imageSets_dir, 'train.txt')
+  train_examples = dataset_util.read_examples_list(train_examples_path)
+  val_examples_path = os.path.join(imageSets_dir, 'test.txt')
+  val_examples = dataset_util.read_examples_list(val_examples_path)
 
-  # Test images are not included in the downloaded data set, so we shall perform
   # our own split.
+  """
   random.seed(42)
   random.shuffle(examples_list)
   num_examples = len(examples_list)
   num_train = int(0.7 * num_examples)
   train_examples = examples_list[:num_train]
   val_examples = examples_list[num_train:]
+  """
   logging.info('%d training and %d validation examples.',
                len(train_examples), len(val_examples))
 

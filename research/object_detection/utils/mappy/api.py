@@ -8,8 +8,6 @@ import requests
 from io import BytesIO
 from PIL import Image
 
-from urllib.error import URLError, HTTPError
-
 from object_detection.utils.mappy.config import cfg
 
 URL = "http://{}/bo".format(cfg.BO.address_port)
@@ -19,9 +17,10 @@ TILES_USED_RANGE = range(2, 6)
 
 def next_id():
     try:
+        print("{}/marking/next".format(URL))
         response = requests.get("{}/marking/next".format(URL),
                                 auth=requests.auth.HTTPBasicAuth(cfg.BO.id, cfg.BO.password))
-        next_id = json.loads(response.text)
+        next_id = json.loads(response.text.encode("utf-8"))
         return next_id["id"]
     except requests.exceptions.HTTPError as errh:
         print("Http Error:", errh)
@@ -34,6 +33,8 @@ def next_id():
         return False
     except requests.exceptions.RequestException as err:
         print("OOps: Something Else", err)
+        return False
+    except:
         return False
 
 

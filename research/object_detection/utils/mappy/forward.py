@@ -3,12 +3,16 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import sys
 import cv2
 import argparse
 import matplotlib
+import json
 import numpy as np
 import tensorflow as tf
-import json
+
+import requests
+from io import BytesIO
 
 from datetime import datetime
 
@@ -17,17 +21,8 @@ from object_detection.utils.mappy.api import get_pano_tiles, get_pano, push_dete
 from object_detection.utils.mappy.timer import Timer
 from object_detection.utils import visualization_utils as vis_util
 
-import numpy as np
-import os
-import sys
-import tensorflow as tf
-
-import requests
-from io import BytesIO
-
 from distutils.version import StrictVersion
 
-'exec(%matplotlib inline)'
 from PIL import Image
 
 # This is needed since the notebook is stored in the object_detection folder.
@@ -92,7 +87,8 @@ def forward(pano_id, tf_detection_graph):
             pano_boxes_and_classes[(left, top, dx, dy)] = classe
 
     if len(pano_boxes_and_classes) > 0:
-        # for the debug
+        ####################
+        #  for the debug
         if DEBUG_SAVE_BLURED_PANO:
             pano_image = get_pano(pano_id)
             pano_image = load_image_into_numpy_array(pano_image)
@@ -110,6 +106,7 @@ def forward(pano_id, tf_detection_graph):
                 )
 
             cv2.imwrite('../../../../../tmp/{}.jpg'.format(pano_id), pano_image)
+        ####################
 
         for box, classe in pano_boxes_and_classes.items():
             x, y, dx, dy = box
@@ -123,8 +120,9 @@ def forward(pano_id, tf_detection_graph):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Mappy Tensorflow Object Dectection Faster R-CNN Blur')
-    parser.add_argument('--pano_id', dest='pano_id', default=None, help='Optional test on id')
-
+    parser.add_argument('--id', dest='id', default=None, help='Optional test on id')
+    parser.add_argument('--ids', type=str, dest='ids', default=[], action='store', help='Optional test on a list of id')
+    parser.add_argument('--limit', type=int, dest='limit', default=None, help='Optional test on id')
     return parser.parse_args()
 
 
@@ -200,15 +198,12 @@ def boxes_and_classes(
 
 if __name__ == '__main__':
     args = parse_args()
-    im_id = args.pano_id
+
+    im_id = args.id
+    num_limit = args.limit
 
     logfile = '../../../../../logs/run_{}'.format(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
     print(logfile)
-
-    #For debug
-    #PATH_TO_TEST_IMAGES_DIR = '/Users/tientranthuong/dev/mappy/boss/ia/models_mappy/test_images/*.jpg'
-    #TEST_IMAGE_PATHS = glob.glob(PATH_TO_TEST_IMAGES_DIR)
-    #print(TEST_IMAGE_PATHS)
 
     # Load a (frozen) Tensorflow model into memory
     detection_graph = tf.Graph()
@@ -241,9 +236,10 @@ if __name__ == '__main__':
 
             push_detection(pano_annotations, im_id)
 
-        #just one pano from snap
-        #break
         i += 1
         im_id = None
+
+        if num_limit is not None and i >= num_limit:
+            break
 
     print("End")

@@ -25,7 +25,7 @@ cfg.BO = edict()
 cfg.BO.id = "IA"
 cfg.BO.password = "mappyIaBoss"
 cfg.BO.address_port = "snap-panoramicbo-003.mappy.priv:9090"
-#cfg.BO.address_port = "10.20.0.168:9090"
+cfg.BO.address_port = "10.20.0.168:9090"
 
 # Combining shape
 cfg.NB_BOX_W = 100
