@@ -2,11 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 import sys
 import cv2
 import argparse
-import matplotlib
 import json
 import numpy as np
 import tensorflow as tf
@@ -31,14 +29,6 @@ from object_detection.utils import ops as utils_ops
 
 if StrictVersion(tf.__version__) < StrictVersion('1.12.0'):
     raise ImportError('Please upgrade your TensorFlow installation to v1.12.*.')
-
-# Path to frozen detection graph. This is the actual model that is used for the object detection.
-PATH_TO_FROZEN_GRAPH = '../../../../../mappy_trained_models/model_dir_tien/exported_graphs/frozen_inference_graph.pb'
-
-# List of the strings that is used to add correct label for each box.
-PATH_TO_LABELS = os.path.join('../../data', 'mappy_blur_label_map.pbtxt')
-
-matplotlib.use('Agg')
 
 DEBUG_SAVE_BLURED_PANO = False
 PANO_IMAGE_WIDTH = 2048 * 6
@@ -105,7 +95,7 @@ def forward(pano_id, tf_detection_graph):
                     use_normalized_coordinates=False
                 )
 
-            cv2.imwrite('../../../../../tmp/{}.jpg'.format(pano_id), pano_image)
+            cv2.imwrite('{}/{}.jpg'.format(cfg.TMP_DIR, pano_id), pano_image)
         ####################
 
         for box, classe in pano_boxes_and_classes.items():
@@ -120,8 +110,8 @@ def forward(pano_id, tf_detection_graph):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Mappy Tensorflow Object Dectection Faster R-CNN Blur')
-    parser.add_argument('--id', dest='id', default=None, help='Optional test on id')
-    parser.add_argument('--ids', type=str, dest='ids', default=[], action='store', help='Optional test on a list of id')
+    parser.add_argument('--cfg', type=str, dest='cfg_file', default=None, help='Path to YAML config file')
+    parser.add_argument('--ids', type=str, dest='ids', default=[], action='store', nargs='+', help='Optional test on a list of id')
     parser.add_argument('--limit', type=int, dest='limit', default=None, help='Optional test on id')
     return parser.parse_args()
 
@@ -198,31 +188,38 @@ def boxes_and_classes(
 
 if __name__ == '__main__':
     args = parse_args()
+    print("args: {}".format(args))
 
-    im_id = args.id
+    if args.cfg_file:
+        cfg.cfg_from_file(args.cfg_file)
+
+    im_ids = args.ids
     num_limit = args.limit
 
-    logfile = '../../../../../logs/run_{}'.format(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+    logfile = cfg.LOG_FILE_TEMPLATE.format(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
     print(logfile)
+
+    print("Config :\n   logfile {}\n   GRAPH_FILE {}\n   TMP_DIR {}".format(logfile, cfg.GRAPH_FILE, cfg.TMP_DIR));
 
     # Load a (frozen) Tensorflow model into memory
     detection_graph = tf.Graph()
     with detection_graph.as_default():
         od_graph_def = tf.compat.v1.GraphDef()
-        with tf.io.gfile.GFile(PATH_TO_FROZEN_GRAPH, 'rb') as fid:
+        with tf.io.gfile.GFile(cfg.GRAPH_FILE, 'rb') as fid:
             serialized_graph = fid.read()
             od_graph_def.ParseFromString(serialized_graph)
             tf.import_graph_def(od_graph_def, name='')
 
     i = 0
     infinite_loop = True
+    im_id = None
     while infinite_loop:
-        if not im_id:
+        if len(im_ids) == 0:
             im_id = next_id()
-        else:
-            infinite_loop = False
+        elif i < len(im_ids):
+            im_id = im_ids[i]
 
-        if im_id is False:
+        if not im_id:
             break
 
         print(im_id)
@@ -234,7 +231,8 @@ if __name__ == '__main__':
             with open(logfile, 'a') as f:
                 f.write("n {} : {}  |  {} sc\n".format(i, im_id, det_time))
 
-            push_detection(pano_annotations, im_id)
+            if not DEBUG_SAVE_BLURED_PANO:
+                push_detection(pano_annotations, im_id)
 
         i += 1
         im_id = None
